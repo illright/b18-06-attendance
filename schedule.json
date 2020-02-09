@@ -1,0 +1,155 @@
+[
+  [
+    {
+      "name": "Introduction to AI",
+      "type": "Lecture",
+      "room": "105"
+    },
+    null,
+    {
+      "name": "Data Modelling and Databases II",
+      "type": "Lecture",
+      "room": "105"
+    },
+    {
+      "name": "Data Modelling and Databases II",
+      "type": "Tutorial",
+      "room": "105"
+    },
+    null,
+    {
+      "name": "Introduction to AI",
+      "type": "Lab",
+      "room": "316"
+    }
+  ],
+  [
+    {
+      "name": "Control Theory",
+      "type": "Lecture",
+      "room": "105"
+    },
+    {
+      "name": "Control Theory",
+      "type": "Tutorial",
+      "room": "105"
+    },
+    null,
+    {
+      "name": "Control Theory",
+      "type": "Lab",
+      "room": "317"
+    },
+    null,
+    null
+  ],
+  [
+    null,
+    {
+      "name": "Probability and Statistics",
+      "type": "Lecture",
+      "room": "105"
+    },
+    {
+      "name": "Probability and Statistics",
+      "type": "Tutorial",
+      "room": "105"
+    },
+    {
+      "name": "Probability and Statistics",
+      "type": "Lab",
+      "room": "301"
+    },
+    {
+      "name": "Data Modelling and Databases II",
+      "type": "Lab",
+      "room": "303"
+    },
+    null
+  ],
+  [
+    null,
+    {
+      "name": "Networks",
+      "type": "Lecture",
+      "room": "105"
+    },
+    {
+      "name": "Networks",
+      "type": "Tutorial",
+      "room": "105"
+    },
+    null,
+    {
+      "name": "Networks",
+      "type": "Lab",
+      "room": "320"
+    },
+    null
+  ],
+  [
+    null,
+    {
+      "name": "Software Project",
+      "type": "Lecture",
+      "room": "106"
+    },
+    null,
+    {
+      "name": "Software Project",
+      "type": "Lab",
+      "room": "306"
+    },
+    null,
+    null
+  ]
+
+  ,[
+    {
+      "name": "Introduction to AI",
+      "type": "Lecture",
+      "room": "105"
+    },
+    null,
+    {
+      "name": "Data Modelling and Databases II",
+      "type": "Lecture",
+      "room": "105"
+    },
+    {
+      "name": "Data Modelling and Databases II",
+      "type": "Tutorial",
+      "room": "105"
+    },
+    null,
+    {
+      "name": "Introduction to AI",
+      "type": "Lab",
+      "room": "316"
+    }
+  ],
+  [
+    {
+      "name": "Introduction to AI",
+      "type": "Lecture",
+      "room": "105"
+    },
+    null,
+    {
+      "name": "Data Modelling and Databases II",
+      "type": "Lecture",
+      "room": "105"
+    },
+    {
+      "name": "Data Modelling and Databases II",
+      "type": "Tutorial",
+      "room": "105"
+    },
+    null,
+    {
+      "name": "Introduction to AI",
+      "type": "Lab",
+      "room": "316"
+    }
+  ]
+]
