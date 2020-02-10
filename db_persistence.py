@@ -25,7 +25,7 @@ class DBPersistence(BasePersistence):
         c = self.connection.cursor()
         c.execute('''
             CREATE TABLE IF NOT EXISTS chat_data (
-                chat_id integer,
+                chat_id varchar(100),
                 headers bytea,
                 attendance bytea,
                 users bytea
@@ -39,9 +39,9 @@ class DBPersistence(BasePersistence):
         c.execute('''SELECT chat_id, headers, attendance, users FROM chat_data''')
         data = defaultdict(dict)
         for row in c.fetchall():
-            data[row[0]] = {'headers': pickle.loads(row[1]),
-                            'attendance': pickle.loads(row[2]),
-                            'users': pickle.loads(row[3])}
+            data[int(row[0])] = {'headers': pickle.loads(row[1]),
+                                 'attendance': pickle.loads(row[2]),
+                                 'users': pickle.loads(row[3])}
         return data
 
     def update_chat_data(self, chat_id, data):
@@ -64,9 +64,9 @@ class DBPersistence(BasePersistence):
                          SET headers = %s, attendance = %s, users = %s
                          WHERE chat_id = %s''', full_data)
         else:
-            full_data = [chat_id, pickle.dumps(data['headers']),
-                                  pickle.dumps(data['attendance']),
-                                  pickle.dumps(data['users'])]
+            full_data = [str(chat_id), pickle.dumps(data['headers']),
+                                       pickle.dumps(data['attendance']),
+                                       pickle.dumps(data['users'])]
             c.execute('''INSERT INTO chat_data (chat_id, headers, attendance, users)
                          VALUES (%s, %s, %s, %s)''', full_data)
         self.connection.commit()
