@@ -64,6 +64,10 @@ def set_up_notifications(update, context):
                                                    'chat_data': context.chat_data})
         jobs[update.message.chat_id].append(job)
 
+    update.message.reply_text('Notifications set up successfully!\nFor each notification, click '
+                              'the button once to mark yourself present and twice to unmark '
+                              'your presence.')
+
 
 def tear_down_notifications(update, context):
     '''Remove all active jobs for this chat.'''
@@ -78,6 +82,8 @@ def tear_down_notifications(update, context):
     context.chat_data.pop('users')
     context.chat_data.pop('attendance')
     context.chat_data.pop('headers')
+
+    update.message.reply_text('Removed notifcations and dropped all statistics.')
 
 
 def notify_for_class(context):
