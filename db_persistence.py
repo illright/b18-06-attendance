@@ -46,6 +46,11 @@ class DBPersistence(BasePersistence):
 
     def update_chat_data(self, chat_id, data):
         c = self.connection.cursor()
+        if 'headers' not in data:
+            c.execute('DELETE FROM chat_data')
+            self.connection.commit()
+            return
+
         c.execute('''SELECT chat_id, headers, attendance, users
                      FROM chat_data WHERE chat_id = %s''', (chat_id,))
         full_data = c.fetchone()

@@ -66,7 +66,11 @@ def set_up_notifications(update, context):
 
     update.message.reply_text('Notifications set up successfully!\nFor each notification, click '
                               'the button once to mark yourself present and twice to unmark '
-                              'your presence.')
+                              'your presence.\n\n'
+                              'If you no longer want to receive notifications in this chat, '
+                              'use the /stop command.\n'
+                              '<b>Warning</b>: it will export and reset the statistics.',
+                              parse_mode=ParseMode.HTML)
 
 
 def tear_down_notifications(update, context):
