@@ -10,6 +10,8 @@ from datetime import datetime, time, timezone, timedelta
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, PicklePersistence
 
+from db_persistence import DBPersistence
+
 telegram_key = os.getenv('TELEGRAM_API_KEY')
 
 
@@ -176,10 +178,10 @@ def error_handler(bot, update, context):
 
 
 # pylint: disable=invalid-name
-pp = PicklePersistence(filename='doe_attendance_bot.pkl')
+dbp = DBPersistence(db_url=os.getenv('DATABASE_URL'))
 updater = Updater(telegram_key,
                   use_context=True,
-                  persistence=pp)
+                  persistence=dbp)
 dp = updater.dispatcher
 schedule = json.load(open('schedule.json'))
 
