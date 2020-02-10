@@ -52,7 +52,7 @@ class DBPersistence(BasePersistence):
             return
 
         c.execute('''SELECT chat_id, headers, attendance, users
-                     FROM chat_data WHERE chat_id = %s''', (chat_id,))
+                     FROM chat_data WHERE chat_id = %s''', (str(chat_id),))
         full_data = c.fetchone()
         if full_data is not None:
             full_data = list(full_data)
