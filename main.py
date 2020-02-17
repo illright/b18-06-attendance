@@ -7,13 +7,13 @@ import logging
 import os
 from datetime import datetime, time, timezone, timedelta
 
+from pymongo import MongoClient
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, PicklePersistence
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
-from db_persistence import DBPersistence
 
-telegram_key = os.getenv('TELEGRAM_API_KEY')
-
+mongo = MongoClient(os.getenv('MONGODB_URI'))
+db = mongo.telegram
 
 # Enable logging
 # pylint: disable=logging-format-interpolation
@@ -27,67 +27,74 @@ jobs = {}
 
 def get_cell_text(item):
     '''Transform a header element into the cell's text.'''
-    if isinstance(item, str):
+    if item == 'Student':
         return item
 
-    date = datetime.strptime(item[0], '%Y-%m-%d')
-    class_ = schedule[date.weekday()][item[1]]
-    return '\n'.join((date.strftime('%d.%m'), class_['name'], class_['type']))
+    date, slot_idx = item.split('S')
+    date = datetime.strptime(date, '%Y-%m-%d')
+    class_ = schedule[date.weekday()][int(slot_idx)]
+    return '\n'.join((date.strftime('%d.%m'),
+                      class_['name'],
+                      class_['type']))
 
 
-def set_up_notifications(update, context):
+def trigger_setup(update, context):
     '''Set up notifications for this chat, recording the jobs for further teardown.'''
-    logger.info('Setting up notifications')
-    if update.message.chat_id not in jobs:
-        jobs[update.message.chat_id] = []
+    logger.info(f'Setting up notifications for {update.message.chat_id}')
+    set_up_notifications(str(update.message.chat_id))
+
+    context.bot.send_message(update.message.chat_id,
+                             'Notifications set up successfully!\n'
+                             'If you no longer want to receive notifications in this chat, '
+                             'use the /stop command.\n'
+                             '<b>Warning</b>: it will export and reset the statistics.',
+                             parse_mode=ParseMode.HTML)
+
+
+def set_up_notifications(chat_id: str):
+    '''Set up periodic jobs to send notifications.'''
+    if chat_id not in jobs:
+        jobs[chat_id] = []
     else:
         logger.info('Previous jobs found, cancelling them first')
-        for job in jobs[update.message.chat_id]:
+        for job in jobs[chat_id]:
             job.schedule_removal()
-        jobs[update.message.chat_id].clear()
+        jobs[chat_id].clear()
 
-    if 'users' not in context.chat_data:
-        context.chat_data['users'] = {}
-
-    if 'attendance' not in context.chat_data:
-        context.chat_data['attendance'] = {}
-
-    if 'headers' not in context.chat_data:
-        context.chat_data['headers'] = ['Student']
+    chat = db.chats.find_one({'id': chat_id})
+    if chat is None:
+        db.chats.insert_one({
+            'id': chat_id,
+            'users': {},
+            'headers': ['Student'],
+            'attendance': {},
+        })
 
     for slot_idx, slot in enumerate(timeslots):
         job = updater.job_queue.run_daily(notify_for_class,
                                           time=slot,
                                           days=workdays,
                                           context={'slot_idx': slot_idx,
-                                                   'chat_id': update.message.chat_id,
-                                                   'chat_data': context.chat_data})
-        jobs[update.message.chat_id].append(job)
-
-    update.message.reply_text('Notifications set up successfully!\nFor each notification, click '
-                              'the button once to mark yourself present and twice to unmark '
-                              'your presence.\n\n'
-                              'If you no longer want to receive notifications in this chat, '
-                              'use the /stop command.\n'
-                              '<b>Warning</b>: it will export and reset the statistics.',
-                              parse_mode=ParseMode.HTML)
+                                                   'chat_id': chat_id})
+        jobs[chat_id].append(job)
 
 
 def tear_down_notifications(update, context):
     '''Remove all active jobs for this chat.'''
     logger.info('Tearing down notifications')
     export_data(update, context)
-    if update.message.chat_id not in jobs:
+
+    chat_id = str(update.message.chat_id)
+    if chat_id not in jobs:
         return
 
-    for job in jobs[update.message.chat_id]:
+    for job in jobs[chat_id]:
         job.schedule_removal()
+    jobs.pop(chat_id)
 
-    context.chat_data.pop('users')
-    context.chat_data.pop('attendance')
-    context.chat_data.pop('headers')
-
-    update.message.reply_text('Removed notifcations and dropped all statistics.')
+    db.chats.delete_one({'id': chat_id})
+    context.bot.send_message(update.message.chat_id,
+                             'Removed notifcations and dropped all statistics.')
 
 
 def notify_for_class(context):
@@ -96,6 +103,9 @@ def notify_for_class(context):
     bot = context.bot
     weekday = datetime.now().weekday()
     logger.info(f"Running for slot {job.context['slot_idx']} for weekday {weekday}")
+
+    id_query = {'id': job.context['chat_id']}
+    chat = db.chats.find_one(id_query)
 
     class_ = schedule[weekday][job.context["slot_idx"]]
     if class_ is None:
@@ -109,17 +119,21 @@ def notify_for_class(context):
             callback_data=f'{date},{job.context["slot_idx"]}'
         )]]
     )
-    bot.send_message(job.context['chat_id'],
+    bot.send_message(int(job.context['chat_id']),
                      notification.format(**class_),
                      parse_mode=ParseMode.HTML,
                      reply_markup=keyboard)
 
-    job.context['chat_data']['headers'].append((date[:4+3+3], job.context["slot_idx"]))
+    chat['headers'].append(f'{date[:4+3+3]}S{job.context["slot_idx"]}')
+    db.chats.update_one(id_query, {'$set': {'headers': chat['headers']}})
 
 
 def mark_attendance(update, context):
     '''Handler for when people actually press the attendance button.'''
-    if not context.chat_data:
+    id_query = {'id': str(update.effective_chat.id)}
+    chat = db.chats.find_one(id_query)
+
+    if not chat:
         logger.info('An old message triggered, ignoring')
         return
 
@@ -130,19 +144,26 @@ def mark_attendance(update, context):
 
     class_ = schedule[datetime.fromisoformat(date).weekday()][slot]
 
-    user_id = update.callback_query.from_user.id
-    if user_id not in context.chat_data['users']:
-        context.chat_data['users'][user_id] = update.callback_query.from_user.full_name
-        context.chat_data['attendance'][user_id] = {}
+    modifications = {}
+    user_id = str(update.callback_query.from_user.id)
+    if user_id not in chat['users']:
+        chat['users'][user_id] = update.callback_query.from_user.full_name
+        chat['attendance'][user_id] = {}
+        modifications['users'] = chat['users']
+        modifications['attendance'] = chat['attendance']
 
-    if context.chat_data['attendance'][user_id].get((date[:4+3+3], slot), False):
-        context.chat_data['attendance'][user_id][date[:4+3+3], slot] = 0
+    class_id = f'{date[:4+3+3]}S{slot}'
+    if chat['attendance'][user_id].get(class_id, False):
+        chat['attendance'][user_id][class_id] = 0
+        update.callback_query.answer('You have unmarked your presence. '
+                                     'Press again to mark it back.')
     else:
-        context.chat_data['attendance'][user_id][date[:4+3+3], slot] = 1
+        chat['attendance'][user_id][class_id] = 1
+        update.callback_query.answer('You have marked your presence. Press again to unmark it.')
+    modifications['attendance'] = chat['attendance']
 
-    update.callback_query.answer()
-    attendees = sum(context.chat_data['attendance'][user].get((date[:4+3+3], slot), 0)
-                    for user in context.chat_data['attendance'])
+    attendees = sum(chat['attendance'][user].get(class_id, 0)
+                    for user in chat['attendance'])
     keyboard = InlineKeyboardMarkup(
         [[InlineKeyboardButton(
             'I attended',
@@ -159,39 +180,45 @@ def mark_attendance(update, context):
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard
     )
+    db.chats.update_one(id_query, {'$set': modifications})
+
 
 def export_data(update, context):
     '''Return the statistics as a CSV file.'''
     logger.info('Exporting statistics')
-    if not context.chat_data.get('attendance'):
+    chat = db.chats.find_one({'id': str(update.message.chat_id)})
+    if not chat or not chat.get('attendance'):
         update.message.reply_text('No attendance statistics yet.')
         return
 
     file = io.StringIO()
     writer = csv.writer(file)
-    writer.writerow(map(get_cell_text, context.chat_data['headers']))
-    for student in sorted(context.chat_data['attendance'],
-                          key=lambda x: context.chat_data['users'][x]):
+    writer.writerow(map(get_cell_text, chat['headers']))
+    for student in sorted(chat['attendance'], key=lambda x: chat['users'][x]):
         row = []
-        for cell in context.chat_data['headers']:
+        for cell in chat['headers']:
             if cell == 'Student':
-                row.append(context.chat_data['users'][student])
+                row.append(chat['users'][student])
             else:
-                row.append(context.chat_data['attendance'][student].get(cell, 0))
+                row.append(chat['attendance'][student].get(cell, 0))
         writer.writerow(row)
     binary_file = io.BytesIO(file.getvalue().encode())
-    update.message.reply_document(binary_file, filename='B18-06 Attendance.csv')
+    context.bot.send_document(update.message.chat_id, binary_file, filename='B18-06 Attendance.csv')
 
 
-def error_handler(bot, update, context):
-    logger.error(context)
+def error_handler(update, context):  # pylint: disable=unused-argument
+    '''Log any exceptions that occur.'''
+    logger.exception(context.error)
+
+
+def recover_notifications():
+    for chat in db.chats.find():
+        logger.info(f'Restoring notifications for {chat["id"]}')
+        set_up_notifications(chat['id'])
 
 
 # pylint: disable=invalid-name
-dbp = DBPersistence(db_url=os.getenv('DATABASE_URL'))
-updater = Updater(telegram_key,
-                  use_context=True,
-                  persistence=dbp)
+updater = Updater(os.getenv('TELEGRAM_API_KEY'), use_context=True)
 dp = updater.dispatcher
 schedule = json.load(open('schedule.json'))
 
@@ -207,7 +234,17 @@ timeslots = [
     time(hour=17, minute=20, tzinfo=kazan_tz),
 ]
 
-dp.add_handler(CommandHandler('start', set_up_notifications))
+timeslots = [
+    # pylint: disable=bad-whitespace
+    time(hour=12, minute=2, second=0, tzinfo=kazan_tz),
+    time(hour=12, minute=2, second=1, tzinfo=kazan_tz),
+    time(hour=12, minute=2, second=2, tzinfo=kazan_tz),
+    time(hour=12, minute=2, second=3, tzinfo=kazan_tz),
+    time(hour=12, minute=2, second=4, tzinfo=kazan_tz),
+    time(hour=12, minute=2, second=5, tzinfo=kazan_tz),
+]
+
+dp.add_handler(CommandHandler('start', trigger_setup))
 dp.add_handler(CommandHandler('stop', tear_down_notifications))
 dp.add_handler(CallbackQueryHandler(mark_attendance))
 dp.add_handler(CommandHandler('export', export_data))
@@ -215,4 +252,5 @@ dp.add_handler(CommandHandler('export', export_data))
 dp.add_error_handler(error_handler)
 
 updater.start_polling()
+recover_notifications()
 updater.idle()
