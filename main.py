@@ -12,9 +12,9 @@ from pymongo import MongoClient
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
-
-mongo = MongoClient(os.getenv('MONGODB_URI'))
-db = mongo[urlparse(os.getenv('MONGODB_URI')).path[1:]]
+db_uri = os.getenv('MONGODB_URI') + '?retryWrites=false'
+mongo = MongoClient(db_uri)
+db = mongo[urlparse(db_uri).path[1:]]
 
 # Enable logging
 # pylint: disable=logging-format-interpolation
