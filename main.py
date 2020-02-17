@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import os
+from urllib.parse import urlparse
 from datetime import datetime, time, timezone, timedelta
 
 from pymongo import MongoClient
@@ -13,7 +14,7 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
 
 mongo = MongoClient(os.getenv('MONGODB_URI'))
-db = mongo.telegram
+db = mongo[urlparse(os.getenv('MONGODB_URI')).path[1:]]
 
 # Enable logging
 # pylint: disable=logging-format-interpolation
