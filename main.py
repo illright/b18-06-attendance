@@ -235,16 +235,6 @@ timeslots = [
     time(hour=17, minute=20, tzinfo=kazan_tz),
 ]
 
-timeslots = [
-    # pylint: disable=bad-whitespace
-    time(hour=12, minute=2, second=0, tzinfo=kazan_tz),
-    time(hour=12, minute=2, second=1, tzinfo=kazan_tz),
-    time(hour=12, minute=2, second=2, tzinfo=kazan_tz),
-    time(hour=12, minute=2, second=3, tzinfo=kazan_tz),
-    time(hour=12, minute=2, second=4, tzinfo=kazan_tz),
-    time(hour=12, minute=2, second=5, tzinfo=kazan_tz),
-]
-
 dp.add_handler(CommandHandler('start', trigger_setup))
 dp.add_handler(CommandHandler('stop', tear_down_notifications))
 dp.add_handler(CallbackQueryHandler(mark_attendance))
